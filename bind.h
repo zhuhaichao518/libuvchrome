@@ -13,7 +13,7 @@ namespace base {
 	public:
 		ParamWrapper():param(nullptr) {};
 
-		void SetParam(void * param) {
+		void SetParam(void* param) {
 			this->param = param;
 		}
 
@@ -50,13 +50,13 @@ namespace base {
 	public:
 		typedef std::function<ReturnT(Args...)> KeyFunc;
 		constexpr OnceCallback() = default;
-		OnceCallback(OnceCallback&& to){
+		OnceCallback(OnceCallback&& to) {
 			to.param1 = this->param1;
 			to.bindFunc = std::move(this->bindFunc);
 			this->param1 = nullptr;
 		}
 
-		OnceCallback& operator=(OnceCallback&& input) noexcept{  // noexcept = default;
+		OnceCallback& operator=(OnceCallback&& input) noexcept {  // noexcept = default;
 			if (&input == this)
 				return *this;
 			// Release any resource we're holding
@@ -80,17 +80,21 @@ namespace base {
 
 		template <class ReturnT, class ResultT, class ...Args >
 		OnceCallback(ReturnT(*func)(ResultT, Args ...), Args&&... args) {
+			param1 = new ParamWrapper();
+			ResultT* temp = nullptr;
+			param1->SetDeleteFunc(temp);
+			auto tempparam = param1;
 			auto bind_func = std::bind(func, std::placeholders::_1, args...);
-			auto lambda_helper = [bind_func,this]()->ReturnT
+			auto lambda_helper = [bind_func, tempparam]()->ReturnT
 			{
-				ResultT* t = (ResultT*)(this->arg1);
-				return bind_func(*(ResultT*)(this->arg1));
+				ResultT* t = (ResultT*)(tempparam->param);
+				return bind_func(*t);
 			};
 			bindFunc = lambda_helper;
 		}
 
 		template <class ReturnT, class ResultT, class Object, class ...Args >
-		OnceCallback(ReturnT(Object::*func)(ResultT, Args ...), Object* obj_ptr, Args&&... args) {
+		OnceCallback(ReturnT(Object::* func)(ResultT, Args ...), Object* obj_ptr, Args&&... args) {
 			param1 = new ParamWrapper();
 			ResultT* temp = nullptr;
 			param1->SetDeleteFunc(temp);
@@ -109,7 +113,7 @@ namespace base {
 		}
 
 		template <class ReturnT, class Object, class ...Args >
-		OnceCallback(ReturnT(Object::*func)(Args ...), Object* obj_ptr, Args&&... args) {
+		OnceCallback(ReturnT(Object::* func)(Args ...), Object* obj_ptr, Args&&... args) {
 			bindFunc = std::bind(func, obj_ptr, args...);
 		}
 
@@ -117,25 +121,26 @@ namespace base {
 			param1->SetParam(arg1);
 		}
 
+		template <class ReturnType>
+		typename std::enable_if<std::is_same<void, ReturnType>::value, void*>::type operate_result() {
+			Run();
+			return nullptr;
+		}
+
+		template <class ReturnType>
+		typename std::enable_if<!std::is_same<void, ReturnType>::value, void*>::type operate_result() {
+			ReturnT* ret = new ReturnT(Run());
+			return ret;
+		}
+
 		void* operate() {
-			bool is_same_v = std::is_same<void, ReturnT>::value;
-			if (is_same_v) {
-				return nullptr;
-			}
-			else {
-				//convert result to heap;
-				ReturnT* ret = new ReturnT(Run());
-				if (ret == nullptr) {
-					return nullptr;
-				}
-				return ret;
-			}
+			return operate_result<ReturnT>();
 		}
 
 		ReturnT Run() {
 			return bindFunc();
 		}
-		
+
 		template <class T >
 		ReturnT Run(T args) {
 			void* arg1 = (void*)&args;
@@ -145,7 +150,7 @@ namespace base {
 
 	private:
 		std::function<ReturnT(void)> bindFunc;
-		ParamWrapper * param1;
+		ParamWrapper* param1;
 	};
 
 	class CallBackContainerBase {
@@ -173,10 +178,10 @@ namespace base {
 	inline OnceCallback<ReturnT(Args...)> BindOnce(ReturnT(*func)(Args ...), Args&&... args) {
 		return OnceCallback<ReturnT(Args...)>(func, std::forward<Args>(args)...);
 	}
-	
+
 	template <class ReturnT, class ResultT, class ...Args >
 	inline OnceCallback<ReturnT(ResultT, Args...)> BindOnce(ReturnT(*func)(ResultT, Args ...), Args&&... args) {
-		return OnceCallback<ReturnT (ResultT, Args...)>(func, std::forward<Args>(args)...);
+		return OnceCallback<ReturnT(ResultT, Args...)>(func, std::forward<Args>(args)...);
 	}
 
 	template<class ReturnT, class ClassT, class ... ClassFuncArgs>
