@@ -11,7 +11,7 @@
 namespace base {
 	class ParamWrapper {
 	public:
-		ParamWrapper():param(nullptr) {};
+		ParamWrapper() :param(nullptr) {};
 
 		void SetParam(void* param) {
 			this->param = param;
@@ -60,7 +60,9 @@ namespace base {
 			if (&input == this)
 				return *this;
 			// Release any resource we're holding
-			delete param1;
+			if (param1) {
+				delete param1;
+			}
 			// Transfer ownership
 			param1 = input.param1;
 			input.param1 = nullptr;
@@ -150,7 +152,7 @@ namespace base {
 
 	private:
 		std::function<ReturnT(void)> bindFunc;
-		ParamWrapper* param1;
+		ParamWrapper* param1 = nullptr;
 	};
 
 	class CallBackContainerBase {
@@ -165,7 +167,9 @@ namespace base {
 	public:
 		base::OnceCallback<ReturnT(Args1...)> callfunc;
 		virtual void setarg1(void* arg1) {
-			callfunc.setarg1(arg1);
+			if (!!arg1) {
+				callfunc.setarg1(arg1);
+			}
 		};
 		virtual void* operate() { return callfunc.operate(); };
 		CallBackContainer(base::OnceCallback<ReturnT(Args1...)>&& callback) {
